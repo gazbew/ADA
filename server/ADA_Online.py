@@ -1,12 +1,12 @@
-# server/ADA_Online.py (Revised: Emits moved into functions)
 import asyncio
 import base64
 import torch
 import python_weather
 import asyncio
-from google.genai import types
+from google.generativeai.types import FunctionDeclaration, Tool, GenerateContentConfig
+from google.generativeai import Part
 import asyncio
-from google import genai 
+import google.generativeai as genai
 import googlemaps
 from datetime import datetime 
 import os
@@ -52,34 +52,55 @@ class ADA:
             print("CUDA is not available. Using CPU.")
 
         # --- Function Declarations (Keep as before) ---
-        self.get_weather_func = types.FunctionDeclaration(
+        self.get_weather_func = FunctionDeclaration(
             name="get_weather",
             description="Get the current weather conditions (temperature, precipitation, description) for a specified city and state/country (e.g., 'Vinings, GA', 'London, UK').",
-            parameters=types.Schema(
-                type=types.Type.OBJECT, properties={"location": types.Schema(type=types.Type.STRING, description="The city and state, e.g., San Francisco, CA or Vinings, GA")}, required=["location"]
-            )
+            parameters={
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g., San Francisco, CA or Vinings, GA"
+                    }
+                },
+                "required": ["location"]
+            }
         )
-        self.get_travel_duration_func = types.FunctionDeclaration(
+        self.get_travel_duration_func = FunctionDeclaration(
             name="get_travel_duration",
             description="Calculates the estimated travel duration between a specified origin and destination using Google Maps. Considers current traffic for driving mode.",
-            parameters=types.Schema(
-                type=types.Type.OBJECT, properties={
-                    "origin": types.Schema(type=types.Type.STRING, description="The starting address or place name."),
-                    "destination": types.Schema(type=types.Type.STRING, description="The destination address or place name."),
-                    "mode": types.Schema(type=types.Type.STRING, description="Optional: Mode of transport ('driving', 'walking', etc.). Defaults to 'driving'.")
-                }, required=["origin", "destination"]
-            )
+            parameters={
+                "type": "object",
+                "properties": {
+                    "origin": {
+                        "type": "string",
+                        "description": "The starting address or place name."
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": "The destination address or place name."
+                    },
+                    "mode": {
+                        "type": "string",
+                        "description": "Optional: Mode of transport ('driving', 'walking', etc.). Defaults to 'driving'."
+                    }
+                },
+                "required": ["origin", "destination"]
+            }
         )
-        self.get_search_results_func = types.FunctionDeclaration(
+        self.get_search_results_func = FunctionDeclaration(
             name="get_search_results",
             description="Performs a Google search for the given query and returns a list of top result URLs.",
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    "query": types.Schema(type=types.Type.STRING, description="The search term or question to search Google for.")
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search term or question to search Google for."
+                    }
                 },
-                required=["query"]
-            )
+                "required": ["query"]
+            }
         )        
         
         # --- End Function Declarations ---
@@ -101,13 +122,13 @@ class ADA:
         Any Image that is sent with the prompt is being sent from a live video feed from a webcamera.
         """
 
-        self.config = types.GenerateContentConfig(
+        self.config = GenerateContentConfig(
             system_instruction=self.system_behavior,
             tools=[  # <--- Start a list here
-                types.Tool(function_declarations=[
+                Tool(function_declarations=[
                     self.get_weather_func,
                     self.get_travel_duration_func,
-                    self.get_search_results_func
+                        self.get_search_results_func
                 ])
             ]  # <--- End the list here
         )
@@ -401,7 +422,7 @@ class ADA:
                         # Determine mime type from header (e.g., "data:image/jpeg;base64")
                         mime_type = header.split(':')[1].split(';')[0] if ':' in header and ';' in header else "image/jpeg" # Default or parse
                         frame_bytes = base64.b64decode(encoded)
-                        request_content.append(types.Part.from_bytes(data=frame_bytes, mime_type=mime_type))
+                        request_content.append(Part.from_bytes(data=frame_bytes, mime_type=mime_type))
                         print(f"Included image frame with mime_type: {mime_type}")
                     except Exception as e:
                         print(f"Error processing video frame data URL: {e}")
@@ -453,7 +474,7 @@ class ADA:
                                 response_payload = function_result 
 
                                 function_response_parts.append(
-                                    types.Part.from_function_response(
+                                    Part.from_function_response(
                                         name=tool_call_name,
                                         response=response_payload # Pass the result dict directly
                                     )
@@ -462,8 +483,8 @@ class ADA:
                                 print(f"!!! Error calling function {tool_call_name}: {e} !!!")
                                 # Handle error - maybe send an error response back?
                                 # For now, we might skip adding a response part or add an error part
-                                function_response_parts.append(
-                                     types.Part.from_function_response(
+                            function_response_parts.append(
+                                Part.from_function_response(
                                         name=tool_call_name,
                                         response={"error": f"Failed to execute function {tool_call_name}: {str(e)}"}
                                     )
@@ -471,8 +492,8 @@ class ADA:
                         else:
                             print(f"!!! Error: Function '{tool_call_name}' is not available. !!!")
                             # Handle missing function - inform Gemini
-                            function_response_parts.append(
-                                types.Part.from_function_response(
+                        function_response_parts.append(
+                            Part.from_function_response(
                                     name=tool_call_name,
                                     response={"error": f"Function {tool_call_name} not found or implemented."}
                                 )

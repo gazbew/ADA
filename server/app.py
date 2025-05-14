@@ -16,11 +16,18 @@ REACT_APP_PORT = os.getenv('REACT_APP_PORT', '5173')
 REACT_APP_ORIGIN = f"http://localhost:{REACT_APP_PORT}"
 REACT_APP_ORIGIN_IP = f"http://127.0.0.1:{REACT_APP_PORT}"
 
+import eventlet
+eventlet.monkey_patch()
+
 socketio = SocketIO(
     app,
-    async_mode='threading',
-    cors_allowed_origins=[REACT_APP_ORIGIN, REACT_APP_ORIGIN_IP]
+    async_mode='eventlet',
+    cors_allowed_origins="*"
 )
+
+@app.route("/")
+def index():
+    return "ADA server is running"
 
 ada_instance = None
 ada_loop = None

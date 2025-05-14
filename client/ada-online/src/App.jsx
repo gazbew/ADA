@@ -494,7 +494,7 @@ function App() {
     // Connect to the server
     socket.current = io(SERVER_URL, {
       reconnectionAttempts: 5, // Try to reconnect a few times
-      transports: ["websocket"], // Prefer WebSocket
+      
     });
 
     // --- Socket Event Handlers ---
