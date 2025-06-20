@@ -3,10 +3,10 @@ import base64
 import torch
 import python_weather
 import asyncio
-from google.generativeai.types import FunctionDeclaration, Tool, GenerateContentConfig
-from google.generativeai import Part
+from google.generativeai.types import FunctionDeclaration, Tool, GenerationConfig
 import asyncio
 import google.generativeai as genai
+Part = genai.protos.Part # Define Part from genai.protos
 import googlemaps
 from datetime import datetime 
 import os
@@ -122,7 +122,7 @@ class ADA:
         Any Image that is sent with the prompt is being sent from a live video feed from a webcamera.
         """
 
-        self.config = GenerateContentConfig(
+        self.config = GenerationConfig(
             system_instruction=self.system_behavior,
             tools=[  # <--- Start a list here
                 Tool(function_declarations=[
