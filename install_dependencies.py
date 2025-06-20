@@ -29,10 +29,10 @@ def install_dependencies():
     print("Checking for CUDA GPU...")
     if check_cuda():
         print("CUDA GPU detected. Installing torch with CUDA support.")
-        torch_spec = "torch"
+        torch_spec = "torch"  # torchvision and torchaudio will be installed if listed in requirements.txt
     else:
-        print("No CUDA GPU detected. Installing torch-cpu for simpler setup.")
-        torch_spec = "torch-cpu"
+        print("No CUDA GPU detected. Installing torch, torchvision, and torchaudio for CPU.")
+        torch_spec = "torch torchvision torchaudio"
     
     with open('requirements.txt', 'r') as file:
         requirements = file.readlines()
@@ -42,15 +42,43 @@ def install_dependencies():
     requirements = [line.split('#')[0].strip() if '#' in line else line for line in requirements]
     for i, req in enumerate(requirements):
         if req.startswith('torch'):
+            # Replace the torch entry with torch_spec. If torch_spec has multiple packages,
+            # they will be handled in the installation loop.
             requirements[i] = torch_spec
-    
+            # If torch_spec includes torchvision and torchaudio, remove them from other lines to avoid duplicates.
+            if "torchvision" in torch_spec:
+                requirements = [r for r in requirements if not r.startswith('torchvision')]
+            if "torchaudio" in torch_spec:
+                requirements = [r for r in requirements if not r.startswith('torchaudio')]
+            # Re-insert the modified torch_spec at the original position if it was filtered out
+            # This logic needs to be careful if torch_spec itself could be filtered out by subsequent lines.
+            # A simpler way is to handle torch installation separately or ensure it's always one item.
+            # For now, let's assume torch_spec replaces the 'torch' line and other related lines are removed.
+
+    # Remove duplicate entries that might have been introduced or were already there
+    requirements = sorted(list(set(requirements)))
+
+
     print("Installing dependencies...")
-    for req in requirements:
+    for req_line in requirements:
         try:
-            print(f"Installing {req}...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", req])
+            # Split req_line by space to handle multiple packages in one line (e.g., "torch torchvision torchaudio")
+            pkgs_to_install = req_line.split()
+            if not pkgs_to_install:
+                continue
+            print(f"Installing {req_line}...")
+            # Ensure installation happens in the server's venv
+            python_executable = os.path.join("server", "venv", "bin", "python")
+            if not os.path.exists(python_executable):
+                # Fallback for safety, though venv should exist if previous steps ran
+                python_executable = sys.executable
+
+            command = [python_executable, "-m", "pip", "install"] + pkgs_to_install
+            if "torch" in req_line and not check_cuda(): # Apply index-url only for torch CPU install
+                command.extend(["--index-url", "https://download.pytorch.org/whl/cpu"])
+            subprocess.check_call(command)
         except subprocess.CalledProcessError:
-            print(f"Failed to install {req}. Continuing with next dependency.")
+            print(f"Failed to install {req_line}. Continuing with next dependency.")
     
     print("Dependency installation complete.")
 
